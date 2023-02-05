@@ -1,0 +1,168 @@
+buildscript {
+    repositories {
+        mavenCentral()
+        //Needed only for SNAPSHOT versions
+        //maven { url 'https://oss.sonatype.org/content/repositories/snapshots/' }
+    }
+    dependencies {
+        classpath 'info.solidsoft.gradle.pitest:gradle-pitest-plugin:1.5.2'
+    }
+}
+
+plugins {
+    id 'org.springframework.boot'
+    id 'io.spring.dependency-management'
+    id 'java'
+    // Test coverage
+    id 'jacoco'
+
+    // Code style
+    id 'checkstyle'
+
+    // PMD
+    id 'pmd'
+
+    // PITest
+    id 'info.solidsoft.pitest'
+}
+
+group = 'nl.tudelft.cse.sem.template'
+version = '0.0.1-SNAPSHOT'
+sourceCompatibility = 11
+targetCompatibility = 11
+
+repositories {
+    mavenCentral()
+}
+
+sourceSets {
+    integration {
+        java.srcDir "$projectDir/src/integration/java"
+        compileClasspath += main.output + test.output
+        runtimeClasspath += main.output + test.output
+    }
+}
+
+configurations {
+    integrationImplementation.extendsFrom testImplementation
+    integrationRuntime.extendsFrom testRuntime
+}
+
+dependencies {
+    implementation 'org.springframework.boot:spring-boot-starter'
+    implementation 'org.springframework.boot:spring-boot-starter-web'
+    implementation 'org.springframework.boot:spring-boot-starter-webflux'
+    implementation('org.springframework.boot:spring-boot-starter-validation')
+
+
+    implementation group: 'io.jsonwebtoken', name: 'jjwt-api', version: '0.10.5'
+    //implementation('io.jsonwebtoken:jjwt:0.2')
+
+    implementation 'org.springframework.boot:spring-boot-starter-data-jpa'
+    //implementation('io.jsonwebtoken:jjwt:0.2')
+
+    implementation group: 'io.jsonwebtoken', name: 'jjwt', version: '0.9.1'
+    compile('javax.xml.bind:jaxb-api:2.3.0')
+    //compile('io.jsonwebtoken:jjwt:0.9.0')
+    //compile("com.auth0:java-jwt:3.4.0")
+    //compile group: 'javax.xml.bind', name: 'jaxb-api', version: '2.3.0'
+    testImplementation('org.springframework.boot:spring-boot-starter-test') {
+        exclude group: 'org.junit.vintage', module: 'junit-vintage-engine'
+    }
+    testImplementation('org.junit.jupiter:junit-jupiter:5.5.2')
+    testImplementation group: 'org.mockito', name: 'mockito-core', version: '3.1.0'
+    testImplementation('org.assertj:assertj-core:3.14.0')
+    compile 'org.springframework.boot:spring-boot-starter-security'
+    testCompile('org.springframework.security:spring-security-test')
+    // these two
+    //compile group: 'io.jsonwebtoken', name: 'jjwt', version: '0.2'
+
+    // Use MySQL Connector-J
+    compile 'mysql:mysql-connector-java'
+
+    // Mockito
+    testCompile "org.mockito:mockito-core:3.+"
+
+    //WebClient
+    implementation 'org.springframework.boot:spring-boot-starter-webflux'
+
+    //MockWebServer
+    testImplementation("com.squareup.okhttp3:mockwebserver:4.9.0")
+    // Dependency of MockWebServer in testing
+    implementation("com.squareup.okhttp3:okhttp:4.9.0")
+
+
+}
+
+test {
+    useJUnitPlatform()
+    jacoco {
+        enabled = true
+        includes = ['nl.tudelft.sem.template.*']
+        excludes = []
+    }
+}
+
+task integrationTest(type: Test) {
+    testClassesDirs = sourceSets.integration.output.classesDirs
+    classpath = sourceSets.integration.runtimeClasspath
+    useJUnitPlatform()
+    jacoco {
+        enabled = true
+        includes = ['nl.tudelft.sem.template.*']
+        excludes = []
+    }
+}
+
+check.dependsOn integrationTest
+test.dependsOn integrationTest
+
+repositories {
+    mavenCentral()
+}
+
+jacocoTestReport() {
+    dependsOn = [test, integrationTest]
+    executionData(file("${project.buildDir}/jacoco/test.exec"),
+            file("${project.buildDir}/jacoco/integrationTest.exec"))
+}
+
+jacocoTestCoverageVerification() {
+    dependsOn = [test, integrationTest]
+    executionData(file("${project.buildDir}/jacoco/test.exec"),
+            file("${project.buildDir}/jacoco/integrationTest.exec"))
+    violationRules {
+        rule {
+            enabled = true
+            element = 'CLASS'
+            includes = ['nl.tudelft.sem.template.*']
+
+            limit {
+                counter = 'BRANCH'
+                value = 'COVEREDRATIO'
+                minimum = 0.1
+            }
+        }
+    }
+}
+
+checkstyle {
+    toolVersion "8.37"
+    configFile = file("${rootDir}/config/checkstyle/checkstyle.xml")
+}
+
+pmd {
+    incrementalAnalysis = true
+}
+
+apply plugin: 'info.solidsoft.pitest'
+pitest {
+    //adds dependency to org.pitest:pitest-junit5-plugin and sets "testPlugin" to "junit5"
+    junit5PluginVersion = '0.12'
+
+    targetClasses = ['nl.tudelft.sem.template.*']
+    pitestVersion = '1.5.1' //not needed when a default PIT version should be used
+    threads = 4
+    outputFormats = ['XML', 'HTML']
+    timestampedReports = false
+}
